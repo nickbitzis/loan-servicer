@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Lint
+        run: |
+          uvx ruff check .
+          uvx ruff format --check .
+      - name: Test
+        run: uv run --python 3.12 --group dev pytest -q
+
+  invariants:
+    # 12 simulated months on 5,000 loans. Fails unless every monthly invariant holds
+    # and every pool's remittance ties out to the cent.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Simulate 12 months with the strict gate
+        run: |
+          mkdir -p out
+          uv run --python 3.12 loanservicer simulate --months 12 --strict --step-summary --json out/sim-12m.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: simulation-12m
+          path: out/sim-12m.json
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t loan-servicer:ci .
+      - name: Smoke test container
+        run: |
+          docker run -d --name ls -e LS_LOANS=500 -e LS_MONTHS=6 -p 8880:8880 loan-servicer:ci
+          for i in $(seq 1 60); do curl -sf http://localhost:8880/healthz && break; sleep 1; done
+          curl -sf http://localhost:8880/api/investor/reconciliation | grep '"ties_out":true'
+          curl -sf http://localhost:8880/metrics | grep ls_remittance_ties_out
+          docker rm -f ls

@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loan Servicer</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --faint: #8a8984; --border: #dde2e9;
+  --grid: #e9ebee; --accent: #2a78d6;
+  --good: #11804f; --good-soft: #e3f5ec; --bad: #b42318; --bad-soft: #fde8e6; --warn: #8a5a00; --warn-soft: #fff4dc;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --radius: 10px; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --panel: #1a1a19; --text: #f0efec; --muted: #c3c2b7; --faint: #8f8e86; --border: #2e2e2b;
+    --grid: #2a2a27; --accent: #3987e5;
+    --good: #4ccb8f; --good-soft: #15302a; --bad: #ff8a7a; --bad-soft: #3b1d1b; --warn: #f3c46b; --warn-soft: #3a2e14;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --panel: #1a1a19; --text: #f0efec; --muted: #c3c2b7; --faint: #8f8e86; --border: #2e2e2b;
+  --grid: #2a2a27; --accent: #3987e5;
+  --good: #4ccb8f; --good-soft: #15302a; --bad: #ff8a7a; --bad-soft: #3b1d1b; --warn: #f3c46b; --warn-soft: #3a2e14;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+}
+* { box-sizing: border-box; }
+html, body { overflow-x: hidden; }
+body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
+header { padding: 18px 24px 6px; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 13px; margin: 0 0 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+h3 { font-size: 14px; margin: 14px 0 8px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+main { padding: 8px 24px 24px; display: grid; gap: 16px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; min-width: 0; }
+.s2 { grid-column: span 2; } .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s6 { grid-column: span 6; }
+.kpis { display: flex; gap: 28px; flex-wrap: wrap; }
+.kpi .v { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .l { color: var(--muted); font-size: 12px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.ok { background: var(--good-soft); color: var(--good); }
+.no { background: var(--bad-soft); color: var(--bad); }
+.wn { background: var(--warn-soft); color: var(--warn); }
+select, button, input { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; max-width: 100%; }
+button { cursor: pointer; }
+button:hover, .chip:hover { border-color: var(--accent); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row input { width: 140px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 5px 8px; border-top: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; border-top: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; max-width: 100%; }
+.tall { max-height: 360px; overflow-y: auto; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 18px; }
+.facts .l { color: var(--muted); font-size: 12px; }
+.facts .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+.bar { display: flex; gap: 2px; height: 12px; min-width: 120px; width: 180px; }
+.bar span { display: block; height: 100%; border-radius: 3px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; background: var(--panel); cursor: pointer; font-size: 12px; }
+.chip.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.notice { background: var(--bg); border: 1px dashed var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.5; }
+.notice p { margin: 0 0 4px; }
+.chart { position: relative; }
+.chart svg { width: 100%; height: auto; display: block; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12); display: none; white-space: nowrap; }
+.err { color: var(--bad); }
+@media (max-width: 900px) {
+  main { grid-template-columns: minmax(0, 1fr); padding: 8px 16px 16px; }
+  .s2, .s3, .s4, .s6 { grid-column: auto; }
+  header { padding: 16px 16px 4px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Loan Servicer</h1>
+  <div class="muted small" id="sub">Loading the simulated book...</div>
+</header>
+<main>
+  <section class="panel s6">
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section class="panel s3">
+    <h2>Delinquency by bucket, share of active loans</h2>
+    <div class="legend" id="chartLegend"></div>
+    <div class="chart" id="chart"><div class="tip" id="tip"></div></div>
+    <h3>Roll rates, <span id="rollMonth"></span></h3>
+    <div class="scroll"><table id="roll"></table></div>
+  </section>
+
+  <section class="panel s3">
+    <h2>Investor remittance</h2>
+    <div class="row"><select id="month" aria-label="Month"></select><span id="tie"></span></div>
+    <div class="scroll"><table id="remit"></table></div>
+    <h3>Reconciliation checks</h3>
+    <div class="scroll"><table id="recon"></table></div>
+  </section>
+
+  <section class="panel s6" id="loanPanel">
+    <h2>Loan</h2>
+    <div class="row">
+      <select id="example" aria-label="Example loans"></select>
+      <input id="loanId" placeholder="TW-100123" aria-label="Loan id">
+      <button id="open">Open</button>
+    </div>
+    <div id="loan"></div>
+  </section>
+
+  <section class="panel s6">
+    <h2>Collections queue</h2>
+    <div class="chips" id="chips"></div>
+    <div class="scroll tall"><table id="queue"></table></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const money = (c) => (c < 0 ? "-$" : "$") + (Math.abs(c) / 100).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const big = (c) => "$" + (c / 1e8).toLocaleString("en-US", {maximumFractionDigits: 1}) + "M";
+const rate = (mp) => (mp / 1000).toFixed(3) + "%";
+const pct = (bp) => (bp / 100).toFixed(2) + "%";
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[ch]));
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const body = await r.json();
+  if (!r.ok) throw new Error(body.error || body.detail || r.statusText);
+  return body;
+}
+const COMPONENTS = [
+  ["interest", "Interest", "--s1"], ["principal", "Principal", "--s2"], ["escrow", "Escrow", "--s3"],
+  ["late_fees", "Late fees", "--s4"], ["escrow_shortage", "Escrow shortage", "--s5"], ["curtailment", "Curtailment", "--s6"],
+  ["suspense", "Suspense", "--s7"], ["unapplied", "Unapplied", "--s8"],
+];
+const BUCKET_SERIES = [["30", "--s1"], ["60", "--s2"], ["90", "--s3"], ["120+", "--s4"]];
+let SUMMARY = null, ASOF = null, BUCKET = null;
+
+function kpis(s) {
+  const sm = s.summary, b = sm.buckets_end, active = sm.active_loans_end;
+  const dq = active - b.current;
+  $("kpis").innerHTML = [
+    ["Active loans", active.toLocaleString()],
+    ["Unpaid principal", big(sm.upb_end)],
+    ["Delinquent 30+", (dq * 100 / active).toFixed(2) + "%"],
+    ["Months simulated", sm.months + " (" + sm.first_month + " to " + sm.last_month + ")"],
+    ["Monthly invariants", `<span class="badge ${sm.all_invariants_hold ? "ok" : "no"}">${sm.all_invariants_hold ? "all hold" : sm.invariant_failures + " failures"}</span>`],
+    ["Remittance tie-out", `<span class="badge ${sm.remittance_ties_out ? "ok" : "no"}">${sm.remittance_ties_out ? "to the cent" : "broken"}</span>`],
+  ].map(([l, v]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+}
+
+function splitBar(splits, amount) {
+  const parts = COMPONENTS.map(([k, , c]) => [k, splits[k] || 0, c]).filter(([, v]) => v > 0);
+  const tot = parts.reduce((a, [, v]) => a + v, 0) || 1;
+  return `<div class="bar" title="${parts.map(([k, v]) => k + " " + money(v)).join(", ")}">` +
+    parts.map(([, v, c]) => `<span style="flex:${v / tot};background:var(${c})"></span>`).join("") + "</div>";
+}
+
+async function openLoan(id) {
+  $("loanId").value = id;
+  if ([...$("example").options].some((o) => o.value === id)) $("example").value = id;
+  const box = $("loan");
+  box.innerHTML = '<p class="muted">Loading...</p>';
+  let d;
+  try { d = await api(`/api/loans/${encodeURIComponent(id)}`); } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  const arm = d.terms.arm ? `ARM, margin ${rate(d.terms.arm.margin_mp)}, caps ${d.terms.arm.initial_cap_mp / 1000}/${d.terms.arm.periodic_cap_mp / 1000}/${d.terms.arm.lifetime_cap_mp / 1000}` : "fixed";
+  const bucketBadge = d.bucket === "current" ? "ok" : (d.bucket === "30" ? "wn" : "no");
+  const facts = [
+    ["Borrower", `${esc(d.borrower.name)}, ${d.borrower.state}, FICO ${d.borrower.fico}`],
+    ["Pool", d.pool_id], ["Product", `${d.product} (${arm})`],
+    ["Status", `${d.status}, ${d.servicing_state} <span class="badge ${bucketBadge}">${d.bucket}</span>`],
+    ["Principal", money(d.principal)], ["Note rate", rate(d.rate_mp)],
+    ["P&I", money(d.pi_payment)], ["Monthly payment", money(d.monthly_payment)],
+    ["Next due", d.next_due + (d.dpd ? ` (${d.dpd} days past due)` : "")], ["Amount due", money(d.amount_due)],
+    ["Suspense / unapplied", money(d.suspense) + " / " + money(d.unapplied)], ["Late fees owed", money(d.late_fees)],
+    ["Remaining term", d.remaining_term + " months"], ["Original", `${money(d.terms.orig_balance)} at ${rate(d.terms.orig_rate_mp)}, ${d.terms.term} months`],
+  ];
+  const e = d.escrow;
+  const events = d.events.slice(-8).reverse().map((ev) => {
+    const extra = ev.event === "arm_reset" ? `${rate(ev.old_rate_mp)} to ${rate(ev.new_rate_mp)}, fully indexed ${rate(ev.fully_indexed_mp)}, limited by ${ev.limited_by}, payment ${money(ev.old_payment)} to ${money(ev.new_payment)}`
+      : ev.event === "recast" ? `payment ${money(ev.old_payment)} to ${money(ev.new_payment)} on ${money(ev.balance)}`
+      : ev.event === "modification" ? `${money(ev.capitalized)} capitalized, ${rate(ev.new_rate_mp)} for ${ev.new_term_months} months, payment ${money(ev.old_payment)} to ${money(ev.new_payment)}`
+      : ev.event === "escrow_analysis" ? esc(ev.action)
+      : ev.event === "payment_plan" ? `plan payment ${money(ev.amount)}` : "";
+    return `<tr><td>${ev.on}</td><td>${ev.event.replace(/_/g, " ")}</td><td>${extra}</td></tr>`;
+  }).join("");
+  const hist = d.history.slice(0, 40).map((t) => {
+    const cash = ["payment", "reversal", "payoff"].includes(t.kind);
+    const rev = t.kind === "payment" && !t.reversed_by ? `<button data-rev="${t.txn_id}" class="small">Reverse (NSF)</button>` : (t.reversed_by ? `<span class="muted small">reversed</span>` : "");
+    const fee = t.splits.late_fee || t.splits.nsf_fee;
+    const what = cash ? splitBar(t.kind === "reversal" ? Object.fromEntries(Object.entries(t.splits).map(([k, v]) => [k, -v])) : t.splits, t.amount)
+      : `<span class="muted small">${esc(t.note)}${fee ? " " + money(fee) : ""}</span>`;
+    const detail = cash ? COMPONENTS.filter(([k]) => t.splits[k]).map(([k, l]) => `${l} ${money(t.splits[k])}`).join(", ") : "";
+    return `<tr><td>${t.on}</td><td>${t.kind.replace(/_/g, " ")}${t.method ? " (" + t.method + ")" : ""}</td><td class="num">${t.amount ? money(t.amount) : ""}</td><td>${what}</td><td class="small muted">${detail}${t.installments.length ? " | paid " + t.installments.join(", ") : ""}</td><td>${rev}</td></tr>`;
+  }).join("");
+  const sched = d.schedule.slice(0, 24).map((r) => `<tr><td>${r.n}</td><td>${r.due}</td><td class="num">${money(r.payment)}</td><td class="num">${money(r.interest)}</td><td class="num">${money(r.principal)}</td><td class="num">${money(r.balance)}</td></tr>`).join("");
+  box.innerHTML = `
+    <div class="facts" style="margin-top:14px">${facts.map(([l, v]) => `<div><div class="l">${l}</div><div class="v">${v}</div></div>`).join("")}</div>
+    ${d.status === "active" ? `<h3>Apply a payment or quote a payoff</h3>
+    <div class="row">
+      <input id="payAmt" inputmode="decimal" value="${(d.amount_due || d.monthly_payment) / 100}" aria-label="Payment amount in dollars">
+      <button id="payBtn">Apply payment</button>
+      <input id="payoffDate" type="date" value="${ASOF}" aria-label="Payoff date">
+      <button id="payoffBtn">Payoff quote</button>
+    </div>
+    <div id="actionOut" class="small" style="margin-top:8px"></div>` : ""}
+    <h3>Payment history and waterfall split</h3>
+    <div class="legend">${COMPONENTS.map(([, l, c]) => `<span><i style="background:var(${c})"></i>${l}</span>`).join("")}</div>
+    <div class="scroll tall"><table><tr><th>Date</th><th>Type</th><th class="num">Amount</th><th>Split</th><th>Detail</th><th></th></tr>${hist}</table></div>
+    ${events ? `<h3>Servicing events</h3><div class="scroll"><table>${events}</table></div>` : ""}
+    <h3>Escrow</h3>
+    ${e.escrowed ? `<div class="facts">${[["Balance", money(e.balance)], ["Monthly deposit", money(e.monthly)], ["Shortage owed", money(e.shortage_outstanding) + (e.shortage_monthly ? " (" + money(e.shortage_monthly) + "/mo)" : "")], ["Annual tax", money(e.annual_tax) + " (months " + e.tax_months.join(", ") + ")"], ["Annual insurance", money(e.annual_insurance)]].map(([l, v]) => `<div><div class="l">${l}</div><div class="v">${v}</div></div>`).join("")}</div>
+    <div class="row" style="margin-top:10px"><select id="spread" aria-label="Shortage spread"><option value="">Spread: investor default</option><option value="12">12 months</option><option value="24">24 months</option><option value="lump">Lump sum</option></select><button id="escBtn">Run escrow analysis</button></div>
+    <div id="escOut" style="margin-top:8px"></div>` : '<p class="muted">No escrow account.</p>'}
+    <h3>Schedule from the next due date (first 24 of ${d.schedule.length})</h3>
+    <div class="scroll"><table><tr><th>#</th><th>Due</th><th class="num">Payment</th><th class="num">Interest</th><th class="num">Principal</th><th class="num">Balance</th></tr>${sched}</table></div>`;
+  box.querySelectorAll("[data-rev]").forEach((b) => b.onclick = async () => {
+    try { await api(`/api/loans/${id}/payments/${b.dataset.rev}/reverse`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({reason: "NSF"})}); openLoan(id); }
+    catch (err) { alert(err.message); }
+  });
+  if ($("payBtn")) $("payBtn").onclick = async () => {
+    const cents = Math.round(parseFloat($("payAmt").value) * 100);
+    try { await api(`/api/loans/${id}/payments`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({amount_cents: cents})}); openLoan(id); loadQueue(); loadRemit($("month").value); }
+    catch (err) { $("actionOut").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+  };
+  if ($("payoffBtn")) $("payoffBtn").onclick = async () => {
+    try {
+      const q = await api(`/api/loans/${id}/payoff?payoff_date=${$("payoffDate").value}`);
+      $("actionOut").innerHTML = `<div class="notice"><p><b>Payoff good through ${q.good_through}: ${money(q.total)}</b></p>
+        <p>Principal ${money(q.principal)} + interest ${money(q.interest)} (${q.interest_days} days from ${q.interest_from} at ${money(q.per_diem)} a day, ${q.day_count} day basis) + late fees ${money(q.late_fees)} + release fee ${money(q.release_fee)} + escrow advance ${money(q.escrow_advance)} - suspense and unapplied ${money(q.suspense_credit + q.unapplied_credit)}.</p>
+        <p>Escrow refund after payoff: ${money(q.escrow_refund_after_payoff)}. Next days: ${q.per_day_after.map((x) => x.date + " " + money(x.total)).join(", ")}.</p></div>`;
+    } catch (err) { $("actionOut").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+  };
+  if ($("escBtn")) $("escBtn").onclick = async () => {
+    try {
+      const r = await api(`/api/loans/${id}/escrow-analysis?spread=${$("spread").value}`);
+      $("escOut").innerHTML = `<div class="notice">${r.notice.map((p) => `<p>${esc(p)}</p>`).join("")}</div>
+        <div class="scroll"><table><tr><th>Month</th><th class="num">Deposit</th><th class="num">Disbursements</th><th class="num">Projected balance</th></tr>
+        ${r.projection.map((x) => `<tr><td>${x.month}</td><td class="num">${money(x.deposit)}</td><td class="num">${x.disbursements ? money(x.disbursements) : ""}</td><td class="num">${money(x.balance)}${x.month === r.low_month ? " (low)" : ""}</td></tr>`).join("")}</table></div>`;
+    } catch (err) { $("escOut").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+  };
+}
+
+function chart(series) {
+  const W = 640, H = 260, L = 44, R = 46, T = 10, B = 28;
+  const months = series.months, n = months.length;
+  const maxV = Math.max(1, ...BUCKET_SERIES.flatMap(([b]) => series.bp[b]));
+  const top = Math.ceil(maxV / 100) * 100;
+  const x = (i) => L + (n === 1 ? 0 : i * (W - L - R) / (n - 1));
+  const y = (v) => T + (H - T - B) * (1 - v / top);
+  let g = "";
+  for (let k = 0; k <= 4; k++) {
+    const v = top * k / 4;
+    g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${(v / 100).toFixed(1)}%</text>`;
+  }
+  months.forEach((m, i) => { if (i % 3 === 0 || i === n - 1) g += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${m}</text>`; });
+  for (const [b, c] of BUCKET_SERIES) {
+    const pts = series.bp[b].map((v, i) => `${x(i)},${y(v)}`).join(" ");
+    const last = series.bp[b][n - 1];
+    g += `<polyline points="${pts}" fill="none" stroke="var(${c})" stroke-width="2" stroke-linejoin="round"/>`;
+    g += `<text x="${W - R + 6}" y="${y(last) + 4}" font-size="11" fill="var(--text)">${b}</text>`;
+  }
+  g += `<line id="cross" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--faint)" stroke-dasharray="3 3" visibility="hidden"/>`;
+  g += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/>`;
+  const el = $("chart");
+  el.querySelector("svg")?.remove();
+  el.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of active loans in each delinquency bucket by month">${g}</svg>`);
+  $("chartLegend").innerHTML = BUCKET_SERIES.map(([b, c]) => `<span><i style="background:var(${c})"></i>${b} days</span>`).join("");
+  const svg = el.querySelector("svg"), tip = $("tip"), cross = svg.querySelector("#cross");
+  svg.querySelector("#hit").addEventListener("mousemove", (ev) => {
+    const r = svg.getBoundingClientRect();
+    const sx = (ev.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(n - 1, Math.round((sx - L) / ((W - L - R) / Math.max(1, n - 1)))));
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+    tip.innerHTML = `<b>${months[i]}</b><br>` + BUCKET_SERIES.map(([b, c]) => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(${c});margin-right:4px"></i>${b}: ${pct(series.bp[b][i])}`).join("<br>");
+    tip.style.display = "block";
+    const px = x(i) * r.width / W;
+    tip.style.left = Math.min(px + 12, r.width - tip.offsetWidth - 4) + "px";
+    tip.style.top = "20px";
+  });
+  svg.querySelector("#hit").addEventListener("mouseleave", () => { tip.style.display = "none"; cross.setAttribute("visibility", "hidden"); });
+}
+
+async function loadRoll() {
+  const r = await api("/api/roll-rates");
+  chart(r.series);
+  $("rollMonth").textContent = r.last_month + " (row: last month, column: this month)";
+  const cols = ["current", "30", "60", "90", "120+", "paid_off"];
+  $("roll").innerHTML = `<tr><th>From</th>${cols.map((c) => `<th class="num">${c.replace("_", " ")}</th>`).join("")}</tr>` +
+    ["current", "30", "60", "90", "120+"].map((a) => [a, r.matrix.rates_bp[a]]).map(([a, row]) => `<tr><td>${a}</td>${cols.map((c) => `<td class="num">${r.matrix.counts[a][c] ? pct(row[c]) : '<span class="muted">0</span>'}</td>`).join("")}</tr>`).join("") +
+    `<tr><td colspan="7" class="small muted">Averages over all simulated months: current to 30 ${pct(r.average_bp["current->30"])}, 30 to 60 ${pct(r.average_bp["30->60"])}, 60 to 90 ${pct(r.average_bp["60->90"])}, 30 cure ${pct(r.average_bp["30->current"])}</td></tr>`;
+}
+
+async function loadRemit(month) {
+  const r = await api("/api/investor/remittance" + (month ? `?month=${month}` : ""));
+  if (!$("month").options.length) {
+    $("month").innerHTML = r.months.slice().reverse().map((m) => `<option>${m}</option>`).join("");
+    $("month").onchange = () => loadRemit($("month").value);
+  }
+  $("tie").innerHTML = `<span class="badge ${r.ties_out ? "ok" : "no"}">${r.ties_out ? "ties out to the cent" : "does not tie out"}</span>`;
+  const rows = [
+    ["Loans scheduled", (p) => p.loans_scheduled.toLocaleString(), true],
+    ["Scheduled principal", (p) => money(p.scheduled_principal)], ["Scheduled interest", (p) => money(p.scheduled_interest)],
+    ["Principal collected", (p) => money(p.actual_scheduled_principal)], ["Curtailments", (p) => money(p.curtailments)],
+    ["Payoffs", (p) => `${money(p.payoff_principal)} (${p.payoffs})`], ["Interest collected", (p) => money(p.actual_interest)],
+    ["Servicing fee", (p) => money(-p.servicing_fee)], ["Guarantee fee", (p) => money(-p.gfee)],
+    ["Remittance", (p) => `<b>${money(p.remittance)}</b>`], ["Scheduled P&I not collected", (p) => money(p.scheduled_minus_collected_pi)],
+  ];
+  $("remit").innerHTML = `<tr><th></th>${r.pools.map((p) => `<th class="num">${p.pool_id}</th>`).join("")}</tr>` +
+    rows.map(([l, f]) => `<tr><td>${l}</td>${r.pools.map((p) => `<td class="num">${f(p)}</td>`).join("")}</tr>`).join("");
+  const rec = await api("/api/investor/reconciliation" + (month ? `?month=${month}` : ""));
+  const checks = rec.pools[0].checks.map((c) => c.check);
+  $("recon").innerHTML = `<tr><th>Check</th>${rec.pools.map((p) => `<th>${p.pool_id}</th>`).join("")}</tr>` +
+    checks.map((name, i) => `<tr><td class="small">${esc(name)}</td>${rec.pools.map((p) => { const c = p.checks[i]; return `<td><span class="badge ${c.ok ? "ok" : "no"}" title="expected ${money(c.expected)}, actual ${money(c.actual)}">${c.ok ? "0.00 off" : money(c.diff) + " off"}</span></td>`; }).join("")}</tr>`).join("");
+}
+
+async function loadQueue() {
+  const q = await api("/api/collections?limit=200" + (BUCKET ? `&bucket=${encodeURIComponent(BUCKET)}` : ""));
+  $("chips").innerHTML = `<span class="chip ${BUCKET ? "" : "on"}" data-b="">All ${q.total}</span>` +
+    Object.entries(q.by_bucket).filter(([b]) => b !== "current").map(([b, n]) => `<span class="chip ${BUCKET === b ? "on" : ""}" data-b="${b}">${b} ${n}</span>`).join("") +
+    `<span class="chip ${BUCKET === "current" ? "on" : ""}" data-b="current">past grace, not yet 30: ${q.by_bucket.current}</span>`;
+  $("chips").querySelectorAll(".chip").forEach((c) => c.onclick = () => { BUCKET = c.dataset.b || null; loadQueue(); });
+  $("queue").innerHTML = `<tr><th>#</th><th>Loan</th><th>Borrower</th><th class="num">DPD</th><th>Bucket</th><th class="num">Amount due</th><th class="num">Score</th><th>Next action</th><th>Why</th></tr>` +
+    q.queue.slice(0, 60).map((r) => `<tr><td>${r.rank}</td><td><a href="#" data-loan="${r.loan_id}">${r.loan_id}</a></td><td>${esc(r.borrower)}</td><td class="num">${r.dpd}</td><td>${r.bucket}</td><td class="num">${money(r.amount_due)}</td><td class="num">${r.score}</td><td>${r.action.replace(/_/g, " ")}</td><td class="small muted">${esc(r.reason)}; ${esc(r.factors.slice(1).join(", "))}</td></tr>`).join("");
+  $("queue").querySelectorAll("[data-loan]").forEach((a) => a.onclick = (ev) => { ev.preventDefault(); openLoan(a.dataset.loan); $("loanPanel").scrollIntoView({behavior: "smooth"}); });
+}
+
+(async function init() {
+  SUMMARY = await api("/api/summary");
+  ASOF = SUMMARY.as_of;
+  $("sub").textContent = `${SUMMARY.servicer}, a made-up servicer. ${SUMMARY.summary.loans.toLocaleString()} synthetic loans, seed ${SUMMARY.summary.seed}. Book date ${ASOF}. Rules are illustrative.`;
+  kpis(SUMMARY);
+  $("example").innerHTML = SUMMARY.examples.map((e) => `<option value="${e.loan_id}">${esc(e.label)} (${e.loan_id})</option>`).join("");
+  $("example").onchange = () => openLoan($("example").value);
+  $("open").onclick = () => openLoan($("loanId").value.trim());
+  const params = new URLSearchParams(location.search);
+  openLoan(params.get("loan") || (SUMMARY.examples[0] || {}).loan_id || "TW-100000");
+  loadRoll(); loadRemit(); loadQueue();
+})().catch((e) => { $("sub").innerHTML = `<span class="err">${esc(e.message)}</span>`; });
+</script>
+</body>
+</html>
